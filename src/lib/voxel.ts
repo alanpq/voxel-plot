@@ -17,7 +17,7 @@ export class VoxelWorld {
   tileTextureWidth: number;
   tileTextureHeight: number;
 
-  public layer?: number;
+  public layer = 0;
 
   constructor(options: {
     cellSize: number,

@@ -70,43 +70,44 @@
     tileTextureWidth,
     tileTextureHeight,
   });
-  
-  generate(world, options);
 
-  const regenerate = () => {
-    generate(world, options);
-    const {positions, normals, uvs, indices} = world.generateGeometryDataForCell(0, 0, 0);
-    const geometry = new THREE.BufferGeometry();
-
-  }
-
-
-  const {positions, normals, uvs, indices} = world.generateGeometryDataForCell(0, 0, 0);
-  const geometry = new THREE.BufferGeometry();
+  const positionNumComponents = 3;
+  const normalNumComponents = 3;
+  const uvNumComponents = 2;
   const material = new THREE.MeshLambertMaterial({
     map: texture,
     // side: THREE.DoubleSide,
     alphaTest: 0.1,
     transparent: true,
   });
+  const mesh = new THREE.Mesh(undefined, material);
+  let world_off = new THREE.Vector3(-world.cellSize/2, -world.cellSize/2, -world.cellSize/2)
 
-  const positionNumComponents = 3;
-  const normalNumComponents = 3;
-  const uvNumComponents = 2;
-  geometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(new Float32Array(positions), positionNumComponents));
-  geometry.setAttribute(
-      'normal',
-      new THREE.BufferAttribute(new Float32Array(normals), normalNumComponents));
-  geometry.setAttribute(
-      'uv',
-      new THREE.BufferAttribute(new Float32Array(uvs), uvNumComponents));
-  geometry.setIndex(indices);
-  const mesh = new THREE.Mesh(geometry, material);
-  const world_off = new THREE.Vector3(-world.cellSize/2, -world.cellSize/2, -world.cellSize/2)
-  mesh.position.copy(world_off);
+  const regenerate = (only_mesh = false) => {
+    if(!only_mesh) {
+      generate(world, options);
+      world_off = new THREE.Vector3(-world.cellSize/2, -world.cellSize/2, -world.cellSize/2)
+    }
+
+    const {positions, normals, uvs, indices} = world.generateGeometryDataForCell(0, 0, 0);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(new Float32Array(positions), positionNumComponents));
+    geometry.setAttribute(
+        'normal',
+        new THREE.BufferAttribute(new Float32Array(normals), normalNumComponents));
+    geometry.setAttribute(
+        'uv',
+        new THREE.BufferAttribute(new Float32Array(uvs), uvNumComponents));
+    geometry.setIndex(indices);
+    mesh.geometry.dispose();
+    mesh.geometry = geometry;
+    mesh.position.copy(world_off);
+
+  }
   scene.add(mesh);
+  regenerate();
 
   let grid = new THREE.GridHelper(100, 100);
 
@@ -130,16 +131,14 @@
 	composer.addPass(ssaoPass);
 	const outputPass = new OutputPass();
 	composer.addPass(outputPass);
-  
+
 	// Init gui
 	const gui = new GUI();
 	gui
-    .add(options, 'layer', 0, data.size-1, 1)
+    .add(world, 'layer', 0, world.cellSize-1, 1)
    .listen()
-   .onChange(() => {});
-   gui.add(options, 'radius', 0, 50, 1).onChange(() => {
-    generate(world, options);
-   });
+   .onChange(() => {regenerate(true)});
+   gui.add(options, 'radius', 0, 50, 1).onChange(regenerate);
 	const ssao_gui = gui.addFolder('SSAO').close();
 	ssao_gui
 		.add(ssaoPass, 'output', {
@@ -177,10 +176,12 @@
 	function onKeyDown(e: KeyboardEvent) {
 		switch (e.key) {
 			case 'ArrowUp':
-				options.layer = Math.min(data.size-1, options.layer + 1);
+				world.layer = Math.min(world.cellSize-1, world.layer + 1);
+        regenerate(true);
 				break;
 			case 'ArrowDown':
-				options.layer = Math.max(0, options.layer - 1);
+				world.layer = Math.max(0, world.layer - 1);
+        regenerate(true);
 				break;
       default:
         console.debug(e.key);
