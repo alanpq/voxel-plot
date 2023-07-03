@@ -5,11 +5,12 @@
 
 	import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 	import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
+  // @ts-ignore
 	import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 	import { generate } from '../lib/generators/sphere';
 	import * as geo from '../lib/geometry';
-	import type { VoxelData } from '../lib/voxel';
+	import { VoxelWorld, type VoxelData } from '../lib/voxel';
 
 	const options = {
     radius: 10,
@@ -49,37 +50,72 @@
 	controls.enablePan = false;
 	controls.enableDamping = true;
 
-	let data: VoxelData = {size: 0, voxels: []};
+	let data: VoxelData = {size: 0};
 
-	const material = new THREE.MeshStandardMaterial({
-		roughness: 0.5,
-		metalness: 0
-	});
-	let geometry = new THREE.BufferGeometry();
-	const mesh = new THREE.Mesh(geometry, material);
+
+  const loader = new THREE.TextureLoader();
+  const texture = loader.load('/flourish-cc-by-nc-sa.png');
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+
+
+  const tileSize = 16;
+  const tileTextureWidth = 256;
+  const tileTextureHeight = 64;
+
+  const cellSize = 50;
+  const world = new VoxelWorld({
+    cellSize,
+    tileSize,
+    tileTextureWidth,
+    tileTextureHeight,
+  });
+  
+  generate(world, options);
+
+  const regenerate = () => {
+    generate(world, options);
+    const {positions, normals, uvs, indices} = world.generateGeometryDataForCell(0, 0, 0);
+    const geometry = new THREE.BufferGeometry();
+
+  }
+
+
+  const {positions, normals, uvs, indices} = world.generateGeometryDataForCell(0, 0, 0);
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.MeshLambertMaterial({
+    map: texture,
+    // side: THREE.DoubleSide,
+    alphaTest: 0.1,
+    transparent: true,
+  });
+
+  const positionNumComponents = 3;
+  const normalNumComponents = 3;
+  const uvNumComponents = 2;
+  geometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(new Float32Array(positions), positionNumComponents));
+  geometry.setAttribute(
+      'normal',
+      new THREE.BufferAttribute(new Float32Array(normals), normalNumComponents));
+  geometry.setAttribute(
+      'uv',
+      new THREE.BufferAttribute(new Float32Array(uvs), uvNumComponents));
+  geometry.setIndex(indices);
+  const mesh = new THREE.Mesh(geometry, material);
+  const world_off = new THREE.Vector3(-world.cellSize/2, -world.cellSize/2, -world.cellSize/2)
+  mesh.position.copy(world_off);
+  scene.add(mesh);
 
   let grid = new THREE.GridHelper(100, 100);
-  const recompute_voxels = () => {
-    data = generate(options);
-    options.layer = data.size-1;
 
-    scene.remove(grid);
-    grid = new THREE.GridHelper(data.size+5, data.size+5);
-    scene.add(grid);
-    
-    geo.update_geo(data, options, mesh);
-  }
-	
-
-  recompute_voxels();
 	const ambientLight = new THREE.AmbientLight(0x4d4d4d, 1); // #4D4D4D
 	scene.add(ambientLight);
 
 	const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
 	directionalLight.position.set(0.6, 1, 0.5).normalize();
 	scene.add(directionalLight);
-
-	scene.add(mesh);
 
   scene.add(grid);
 	scene.add(new THREE.AxesHelper(20));
@@ -94,22 +130,30 @@
 	composer.addPass(ssaoPass);
 	const outputPass = new OutputPass();
 	composer.addPass(outputPass);
-
+  
 	// Init gui
 	const gui = new GUI();
 	gui
     .add(options, 'layer', 0, data.size-1, 1)
    .listen()
-   .onChange(() => {geo.update_geo(data, options, mesh)});
-   gui.add(options, 'radius', 0, 50, 1).onChange(recompute_voxels);
-	const ssao_gui = gui.addFolder('SSAO');
+   .onChange(() => {});
+   gui.add(options, 'radius', 0, 50, 1).onChange(() => {
+    generate(world, options);
+   });
+	const ssao_gui = gui.addFolder('SSAO').close();
 	ssao_gui
 		.add(ssaoPass, 'output', {
+      // @ts-ignore
 			Default: SSAOPass.OUTPUT.Default,
+      // @ts-ignore
 			'SSAO Only': SSAOPass.OUTPUT.SSAO,
+      // @ts-ignore
 			'SSAO Only + Blur': SSAOPass.OUTPUT.Blur,
+      // @ts-ignore
 			Beauty: SSAOPass.OUTPUT.Beauty,
+      // @ts-ignore
 			Depth: SSAOPass.OUTPUT.Depth,
+      // @ts-ignore
 			Normal: SSAOPass.OUTPUT.Normal
 		})
 		.onChange(function (value: any) {
@@ -134,11 +178,9 @@
 		switch (e.key) {
 			case 'ArrowUp':
 				options.layer = Math.min(data.size-1, options.layer + 1);
-        geo.update_geo(data, options, mesh);
 				break;
 			case 'ArrowDown':
 				options.layer = Math.max(0, options.layer - 1);
-        geo.update_geo(data, options, mesh);
 				break;
       default:
         console.debug(e.key);
@@ -152,17 +194,29 @@
 			-(event.clientY / window.innerHeight) * 2 + 1
 		);
 
-		raycaster.setFromCamera(pointer, camera);
+    const start = new THREE.Vector3();
+    const end = new THREE.Vector3();
+    start.setFromMatrixPosition(camera.matrixWorld).sub(world_off);
+    end.set(pointer.x, pointer.y, 1).unproject(camera).sub(world_off);
 
-		const intersects = raycaster.intersectObjects([mesh], false);
+    const intersect = world.intersectRay(start, end);
 
-		if (intersects.length > 0) {
-			const intersect = intersects[0];
-			if (!intersect.face) return;
+    if (intersect) {
+      intersect.position.add(world_off);
+      // rollOverMesh.position.copy(intersect.position);
+			rollOverMesh.position.copy(intersect.position).sub(intersect.normal.multiplyScalar(0.5));
+			rollOverMesh.position.floor().addScalar(0.5);
+    }
 
-			rollOverMesh.position.copy(intersect.point).sub(intersect.face.normal.multiplyScalar(0.5));
-			rollOverMesh.position.addScalar(0.5).add(new THREE.Vector3(0, 0.5, 0)).floor().add(new THREE.Vector3(0, -0.5, 0));
-		}
+		// const intersects = raycaster.intersectObjects([mesh], false);
+
+		// if (intersects.length > 0) {
+		// 	const intersect = intersects[0];
+		// 	if (!intersect.face) return;
+
+		// 	rollOverMesh.position.copy(intersect.point).sub(intersect.face.normal.multiplyScalar(0.5));
+		// 	rollOverMesh.position.addScalar(0.5).add(new THREE.Vector3(0, 0.5, 0)).floor().add(new THREE.Vector3(0, -0.5, 0));
+		// }
 	}
 
 	function onWindowResize() {

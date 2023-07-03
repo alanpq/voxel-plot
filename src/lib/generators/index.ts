@@ -1,3 +1,3 @@
-import type { VoxelData } from "../voxel";
+import type { VoxelData, VoxelWorld } from "../voxel";
 
-export type VoxelGenerator<Params> = (params: Params) => VoxelData;
+export type VoxelGenerator<Params> = (world: VoxelWorld, params: Params) => VoxelData;

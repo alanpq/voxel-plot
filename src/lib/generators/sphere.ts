@@ -4,23 +4,22 @@ export type SphereParams = {
   radius: number,
 }
 
-export const generate: VoxelGenerator<SphereParams> = ({ radius }) => {
-  const m = [];
+export const generate: VoxelGenerator<SphereParams> = (world, { radius }) => {
+  world.init({
+    cellSize: radius * 2,
+  })
   const half = radius;
+  const r1 = radius * radius;
+  const r2 = (radius - 1) * (radius - 1);
   for (let x = -half; x < half; x++) {
-    const zs = [];
     for (let z = -half; z < half; z++) {
-      const ys = [];
       for (let y = -half; y < half; y++) {
         const d = (x * x) + (y * y) + (z * z);
-        ys.push(d < radius * radius);
+        world.setVoxel(x + half, y + half, z + half, (d < r1 && d >= r2) ? 1 : 0);
       }
-      zs.push(ys);
     }
-    m.push(zs);
   }
   return {
     size: radius * 2,
-    voxels: m,
   };
 }
