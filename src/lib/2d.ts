@@ -10,6 +10,7 @@ export default class Renderer2D implements Renderer {
   pointer = new THREE.Vector2();
   dragging = false;
   zoom_speed = 1;
+  onion_skins = 2;
 
   camera = {
     scale: 1,
@@ -24,8 +25,14 @@ export default class Renderer2D implements Renderer {
     this.window_resize();
 
     gui.add(this.camera, 'scale', 0.1, 5).listen();
+    gui.add(this, 'onion_skins', 0, 5, 1).name("Onion Skin layers");
     this.canvas.addEventListener("mousedown", () => { this.dragging = true; });
     document.addEventListener("mouseup", () => { this.dragging = false; });
+
+    this.camera.pos.set(
+      this.canvas.width / 2,
+      this.canvas.height / 2,
+    );
 
     this.canvas.addEventListener("wheel", (e) => {
       const wheel = e.deltaY < 0 ? -1 : 1;
@@ -59,7 +66,7 @@ export default class Renderer2D implements Renderer {
     );
 
     this.ctx.lineWidth = 1;
-    this.ctx.strokeStyle = "gray";
+    this.ctx.strokeStyle = "#D6D6D6";
     for (let x = 0; x <= x_tiles; x++) {
       for (let y = 0; y <= y_tiles; y++) {
         this.ctx.strokeRect((origin.x + x) * 100, (origin.y + y) * 100, 100, 100);
@@ -73,12 +80,31 @@ export default class Renderer2D implements Renderer {
     }
     const even = world.cellSize % 2 == 0;
     const halfWorld = Math.floor(world.cellSize / 2);
-    this.ctx.fillStyle = "black";
-    for (let z = 0; z < world.cellSize; ++z) {
-      for (let x = 0; x < world.cellSize; ++x) {
-        const voxel = world.getVoxel(x, world.layer, z);
-        if (voxel && voxel !== 100) {
-          this.ctx.fillRect((x - halfWorld) * 100, (z - halfWorld) * 100, 100, 100);
+    for (let o = 0; o <= this.onion_skins; ++o) {
+      // console.log(o);
+      const l = this.onion_skins ? (1 - (o / this.onion_skins)) : 0;
+
+      for (let z = 0; z < world.cellSize; ++z) {
+        for (let x = 0; x < world.cellSize; ++x) {
+          const voxel = world.getVoxel(x, (world.layer - (this.onion_skins - o) - 1), z, true);
+          if (voxel && voxel !== 100) {
+            this.ctx.fillStyle = `hsl(350, 5%, ${l * 80}%)`;
+            this.ctx.strokeStyle = `hsl(350, 10%, ${Math.max(0, (l * 75) - 30)}%)`;
+            if (o == this.onion_skins) {
+              this.ctx.fillStyle = `#333333`;
+              this.ctx.strokeStyle = "#141414"
+              if (!even) {
+                if (x == halfWorld && z == halfWorld) { this.ctx.fillStyle = `#F3C429`; this.ctx.strokeStyle = "#9C7E19" }
+                else if (x == halfWorld) { this.ctx.fillStyle = `#CE3333`; this.ctx.strokeStyle = `#851313`; }
+                else if (z == halfWorld) { this.ctx.fillStyle = `#303CE2`; this.ctx.strokeStyle = `#171C69`; }
+              }
+            }
+            this.ctx.beginPath();
+            this.ctx.rect((x - halfWorld) * 100, (z - halfWorld) * 100, 100, 100);
+            this.ctx.fill();
+            this.ctx.stroke();
+
+          }
         }
       }
     }
