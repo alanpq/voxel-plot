@@ -175,7 +175,10 @@ export default class Renderer3D implements Renderer {
       this.cur_voxel = intersect.voxel;
       intersect.position.add(this.world_off);
       this.hover_mesh.position.copy(intersect.position).sub(intersect.normal.multiplyScalar(0.5));
-      this.hover_mesh.position.floor(); //.addScalar(0.5);
+      if (world.cellSize % 2 == 0)
+        this.hover_mesh.position.round();
+      else
+        this.hover_mesh.position.floor().addScalar(0.5);
       this.hover_mesh.visible = true;
     } else {
       this.cur_voxel = -1;
@@ -193,12 +196,19 @@ export default class Renderer3D implements Renderer {
   }
 
   regenerate() {
+    this.hover_mesh.visible = false;
     const bb_geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(world.cellSize, world.cellSize, world.cellSize));
     this.bb.geometry.dispose();
     this.bb.geometry = bb_geo;
 
-    const off = Math.round((-world.cellSize / 2) + 0.5) + ((world.cellSize % 2 == 0) ? -0.5 : 0.0);
-    this.world_off = new THREE.Vector3(off, world.layer ? -world.layer : off, off);
+    const even = (world.cellSize % 2 == 0);
+
+    const off = Math.round((-world.cellSize / 2) + 0.5) + (even ? -0.5 : 0.0);
+    this.world_off.set(
+      off,
+      world.layer ? (-world.layer + (even ? 0.5 : 0.0)) : off,
+      off
+    );
     const { positions, normals, uvs, indices } = world.generateGeometryDataForCell(0, 0, 0);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -214,7 +224,7 @@ export default class Renderer3D implements Renderer {
     this.voxels.geometry.dispose();
     this.voxels.geometry = geometry;
     this.voxels.position.copy(this.world_off);
-    this.grid.position.setScalar((world.cellSize % 2 == 0) ? 0.5 : 0);
+    this.grid.position.setScalar(even ? 0.5 : 0);
     this.bb.position.setScalar(0.5);
     if (world.layer) this.bb.position.setY(-(world.layer - world.cellSize / 2));
   };

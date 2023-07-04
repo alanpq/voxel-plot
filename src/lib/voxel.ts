@@ -173,7 +173,7 @@ export class VoxelWorld {
     // main loop along raycast vector
     while (t <= len) {
       const voxel = this.getVoxel(ix, iy, iz);
-      if (voxel) {
+      if (voxel && voxel !== 100) {
         return {
           position: new THREE.Vector3(
             start.x + t * dx,
