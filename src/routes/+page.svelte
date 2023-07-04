@@ -11,7 +11,6 @@
 		is_2d: false,
 		radius: 10,
 		bias: 0.1,
-		layer: 0,
 		shell: true,
 
 		height: 0,
@@ -43,7 +42,7 @@
 		canvas3d.style.display = options.is_2d ? 'none' : 'block';
 	});
 	gui
-		.add(options, 'layer', 0, options.height - 1, 1)
+		.add(world, 'layer', 0, options.height - 1, 1)
 		.listen()
 		.onChange(() => { regenerate(true) });
 	gui.add(options, 'shell').onChange(() => {regenerate()});
