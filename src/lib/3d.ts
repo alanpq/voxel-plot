@@ -133,6 +133,7 @@ export default class Renderer3D implements Renderer {
     this.composer.addPass(outputPass);
 
     gui.add(this.bb, 'visible').name("Draw bounding box");
+    gui.add(world, 'show_midline').name("Show mid-line").onChange(this.regenerate.bind(this));
 
     const ssao_gui = gui.addFolder('SSAO').close();
     ssao_gui

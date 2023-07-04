@@ -17,8 +17,10 @@ export class VoxelWorld {
   tileTextureWidth: number;
   tileTextureHeight: number;
 
-  public layer = 0;
   height: number;
+
+  public show_midline = true;
+  public layer = 0;
 
   constructor(options: {
     cellSize: number,
@@ -102,7 +104,7 @@ export class VoxelWorld {
             // voxel 0 is sky (empty) so for UVs we start at 0
             const midline = voxel == 2;
             const curlayer = (this.layer && this.layer == voxelY + 1);
-            const uvVoxel = curlayer ? 3 : (midline ? 7 : 2);
+            const uvVoxel = (curlayer) ? 3 : ((this.show_midline && midline) ? 7 : 2);
             // There is a voxel here but do we need faces for it?
             for (const { dir, corners, uvRow } of VoxelWorld.faces) {
               const neighbor = this.getVoxel(
