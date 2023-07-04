@@ -132,6 +132,7 @@ export default class Renderer3D implements Renderer {
     const outputPass = new OutputPass();
     this.composer.addPass(outputPass);
 
+    gui.add(this.bb, 'visible').name("Draw bounding box");
     gui.add(this, 'locked').disable().listen();
     gui.add(this, 'cur_voxel').disable().listen();
 
