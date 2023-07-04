@@ -45,6 +45,11 @@ export default class Renderer3D implements Renderer {
   hover_mesh: THREE.Mesh;
   controls: OrbitControls;
 
+  locked = false;
+  cur_voxel = -1;
+  bb: THREE.LineSegments<THREE.BufferGeometry<THREE.NormalBufferAttributes>, THREE.LineBasicMaterial>;
+  grid: THREE.GridHelper;
+
   constructor(canvas: HTMLCanvasElement, gui: GUI) {
     const width = window.innerWidth || 1;
     const height = window.innerHeight || 1;
@@ -62,7 +67,7 @@ export default class Renderer3D implements Renderer {
       window.innerWidth / window.innerHeight,
       0.1, 1000
     );
-    this.camera.position.set(5, 2, options.radius);
+    this.camera.position.set(5, 2, options.size);
     this.pointer = new THREE.Vector2();
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -71,8 +76,8 @@ export default class Renderer3D implements Renderer {
     this.controls.enablePan = false;
     this.controls.enableDamping = true;
 
-    const grid = new THREE.GridHelper(100, 100);
-    this.scene.add(grid);
+    this.grid = new THREE.GridHelper(100, 100);
+    this.scene.add(this.grid);
 
     const ambientLight = new THREE.AmbientLight(0x4d4d4d, 1); // #4D4D4D
     this.scene.add(ambientLight);
@@ -99,6 +104,14 @@ export default class Renderer3D implements Renderer {
     this.voxels = new THREE.Mesh(undefined, material);
     this.scene.add(this.voxels);
 
+    // BOUNDING BOX
+
+    const bb_mat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
+
+    this.bb = new THREE.LineSegments(undefined, bb_mat);
+
+    this.scene.add(this.bb);
+
     // HOVER CUBE
     const hover_geo = new THREE.BoxGeometry(1.01, 1.01, 1.01);
     const hover_mat = new THREE.MeshBasicMaterial({
@@ -119,6 +132,9 @@ export default class Renderer3D implements Renderer {
     const outputPass = new OutputPass();
     this.composer.addPass(outputPass);
 
+    gui.add(this, 'locked').disable().listen();
+    gui.add(this, 'cur_voxel').disable().listen();
+
     const ssao_gui = gui.addFolder('SSAO').close();
     ssao_gui
       .add(ssaoPass, 'output', SSAO_OUTPUTS)
@@ -128,6 +144,11 @@ export default class Renderer3D implements Renderer {
     ssao_gui.add(ssaoPass, 'kernelRadius').min(0).max(32);
     ssao_gui.add(ssaoPass, 'minDistance').min(0.0).max(0.02);
     ssao_gui.add(ssaoPass, 'maxDistance').min(0.00001).max(0.3);
+
+    canvas.addEventListener("mouseup", (e) => {
+      if (e.button !== 2) return;
+      this.locked = !this.locked;
+    })
 
   }
 
@@ -141,6 +162,7 @@ export default class Renderer3D implements Renderer {
       (e.clientX / window.innerWidth) * 2 - 1,
       -(e.clientY / window.innerHeight) * 2 + 1
     );
+    if (this.locked) return;
 
     const start = new THREE.Vector3();
     const end = new THREE.Vector3();
@@ -150,9 +172,14 @@ export default class Renderer3D implements Renderer {
     const intersect = world.intersectRay(start, end);
 
     if (intersect) {
+      this.cur_voxel = intersect.voxel;
       intersect.position.add(this.world_off);
       this.hover_mesh.position.copy(intersect.position).sub(intersect.normal.multiplyScalar(0.5));
-      this.hover_mesh.position.floor().addScalar(0.5);
+      this.hover_mesh.position.floor(); //.addScalar(0.5);
+      this.hover_mesh.visible = true;
+    } else {
+      this.cur_voxel = -1;
+      this.hover_mesh.visible = false;
     }
   }
   window_resize() {
@@ -166,7 +193,11 @@ export default class Renderer3D implements Renderer {
   }
 
   regenerate() {
-    const off = -world.cellSize / 2;
+    const bb_geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(world.cellSize, world.cellSize, world.cellSize));
+    this.bb.geometry.dispose();
+    this.bb.geometry = bb_geo;
+
+    const off = Math.round((-world.cellSize / 2) + 0.5) + ((world.cellSize % 2 == 0) ? -0.5 : 0.0);
     this.world_off = new THREE.Vector3(off, off, off);
     const { positions, normals, uvs, indices } = world.generateGeometryDataForCell(0, 0, 0);
     const geometry = new THREE.BufferGeometry();
@@ -183,5 +214,7 @@ export default class Renderer3D implements Renderer {
     this.voxels.geometry.dispose();
     this.voxels.geometry = geometry;
     this.voxels.position.copy(this.world_off);
+    this.grid.position.setScalar((world.cellSize % 2 == 0) ? 0.5 : 0);
+    this.bb.position.setScalar(0.5);
   };
 }

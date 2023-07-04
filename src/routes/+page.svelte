@@ -1,17 +1,20 @@
 <script lang="ts" context="module">
 	import Renderer3D from '$lib/3d';
 	import Renderer2D from '$lib/2d';
-	import { shell } from '$lib/generators';
-	import { generate } from '$lib/generators/sphere';
+	import { GENERATORS, make_gui_folders, shell } from '$lib/generators';
 	import { VoxelWorld } from '$lib/voxel';
 	import * as THREE from 'three';
 	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
+	import type Renderer from '$lib/renderer';
 
 	export const options = {
 		is_2d: false,
-		radius: 10,
+		size: 10,
 		bias: 0.1,
 		shell: true,
+
+		generator: "sphere",
+		generator_fn: GENERATORS.sphere,
 
 		height: 0,
 	};
@@ -38,28 +41,42 @@
 	
 	const gui = new GUI();
 	gui.add(options, 'is_2d').name("2D").onChange(() => {
+		cur_renderer = (options.is_2d ? r2d : r3d);
 		canvas2d.style.display = options.is_2d ? 'block' : 'none';
 		canvas3d.style.display = options.is_2d ? 'none' : 'block';
+		regenerate(true);
 	});
 	gui
 		.add(world, 'layer', 0, options.height - 1, 1)
 		.listen()
 		.onChange(() => { regenerate(true) });
 	gui.add(options, 'shell').onChange(() => {regenerate()});
-	gui.add(options, 'radius', 0, 50, 1).onChange(() => {regenerate()});
-	gui.add(options, 'bias', 0, 1).onChange(() => {regenerate()});
-
-	const r3d = new Renderer3D(canvas3d, gui.addFolder("3D"));
-	const r2d = new Renderer2D(canvas2d, gui.addFolder("2D"));
+	let cur_renderer: Renderer | null = null;
 	
+	export type RegenerateFn = typeof regenerate;
 	const regenerate = (only_mesh = false) => {
 		if(!only_mesh) {
-			const output = generate(world, options);
+			const output = options.generator_fn(world, options);
 			options.height = output.height;
 			if (options.shell) shell(world);
 		}
-		(options.is_2d ? r2d : r3d).regenerate();
+		cur_renderer?.regenerate();
 	}
+	let gen_folders: ReturnType<typeof make_gui_folders> | null = null;
+	const gen_ctrl = gui.add(options, 'generator', Object.keys(GENERATORS)).onChange((k: keyof typeof GENERATORS) => {
+		options.generator_fn = GENERATORS[k];
+		if(gen_folders) {
+			for(const f of Object.values(gen_folders)) f.hide();
+			for(const c of gen_folders[k].show().controllers) c.updateDisplay();
+		}
+		regenerate();
+	});
+	gen_folders = make_gui_folders(gui, regenerate);
+	gen_ctrl.reset();
+
+	const r3d = new Renderer3D(canvas3d, gui.addFolder("3D").close());
+	const r2d = new Renderer2D(canvas2d, gui.addFolder("2D").close());
+	cur_renderer = (options.is_2d ? r2d : r3d);
 	regenerate();
 	
 
@@ -81,12 +98,12 @@
         break;
     }
 	});
-	document.addEventListener('pointermove', (e) => {(options.is_2d ? r2d : r3d).pointer_move(e)});
-	window.addEventListener('resize', () => {(options.is_2d ? r2d : r3d).window_resize()});
+	document.addEventListener('pointermove', (e) => {cur_renderer?.pointer_move(e)});
+	window.addEventListener('resize', () => {cur_renderer?.window_resize()});
 
 	function animate() {
 		requestAnimationFrame(animate);
-		(options.is_2d ? r2d : r3d).animate();
+		cur_renderer?.animate();
 	}
 	animate();
 </script>

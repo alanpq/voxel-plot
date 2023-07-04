@@ -68,12 +68,12 @@ export class VoxelWorld {
     const voxelOffset = this.computeVoxelOffset(x, y, z);
     cell[voxelOffset] = v;
   }
-  getVoxel(x: number, y: number, z: number) {
+  getVoxel(x: number, y: number, z: number, ignore_layer = false) {
     const cell = this.getCellForVoxel(x, y, z);
     if (!cell) {
       return 0;
     }
-    if (this.layer && y > this.layer) return 0;
+    if (!ignore_layer && this.layer && y > this.layer) return 0;
     const voxelOffset = this.computeVoxelOffset(x, y, z);
     return cell[voxelOffset];
   }
