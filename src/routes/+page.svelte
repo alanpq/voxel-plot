@@ -85,9 +85,12 @@
 	regenerate();
 	
 
+	const loaded = localStorage.getItem('options');
+	if(loaded) gui.load(JSON.parse(loaded));
+	gui.onChange((e) => {
+		localStorage.setItem('options', JSON.stringify(gui.save()));
+	});
 
-	// Init gui
-	
 	document.addEventListener('keydown', (e) => {
     switch (e.key) {
       case 'ArrowUp':
