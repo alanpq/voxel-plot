@@ -86,7 +86,7 @@
 	document.addEventListener('keydown', (e) => {
     switch (e.key) {
       case 'ArrowUp':
-        world.layer = Math.min(world.cellSize - 1, world.layer + 1);
+        world.layer = Math.min(world.cellSize, world.layer + 1);
         regenerate(true);
         break;
       case 'ArrowDown':
