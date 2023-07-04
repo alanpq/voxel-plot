@@ -18,14 +18,12 @@ export default class Renderer2D implements Renderer {
 
   constructor(canvas: HTMLCanvasElement, gui: GUI) {
     this.canvas = canvas;
-    this.canvas.width = window.innerWidth || 1;
-    this.canvas.height = window.innerHeight || 1;
     const ctx = this.canvas.getContext('2d');
     if (!ctx) throw new Error("could not get 2d context");
     this.ctx = ctx;
+    this.window_resize();
 
     gui.add(this.camera, 'scale', 0.1, 5).listen();
-
     this.canvas.addEventListener("mousedown", () => { this.dragging = true; });
     document.addEventListener("mouseup", () => { this.dragging = false; });
 
@@ -45,24 +43,87 @@ export default class Renderer2D implements Renderer {
   }
 
   animate(): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
     this.ctx.resetTransform();
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.clearRect(0, 0, w, h);
+
     this.ctx.translate(this.camera.pos.x, this.camera.pos.y);
-    this.ctx.scale(this.camera.scale * 100, this.camera.scale * 100);
-    this.ctx.fillRect(0, 0, 1, 1);
+    this.ctx.scale(this.camera.scale, this.camera.scale);
+    const x_tiles = (Math.floor(this.canvas.width / this.camera.scale) / 100) + 1;
+    const y_tiles = (Math.floor(this.canvas.height / this.camera.scale) / 100) + 1;
+    const origin = new THREE.Vector2(
+      Math.floor((-(this.camera.pos.x) / this.camera.scale) / 100),
+      Math.floor((-(this.camera.pos.y) / this.camera.scale) / 100),
+    );
+
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeStyle = "gray";
+    for (let x = 0; x <= x_tiles; x++) {
+      for (let y = 0; y <= y_tiles; y++) {
+        this.ctx.strokeRect((origin.x + x) * 100, (origin.y + y) * 100, 100, 100);
+        // this.ctx.fillRect(
+        //   Math.floor((-(this.camera.pos.x - w / 2) / this.camera.scale) / 100) * 100,
+        //   Math.floor((-(this.camera.pos.y - h / 2) / this.camera.scale) / 100) * 100,
+        //   100,
+        //   100
+        // );
+      }
+    }
+    const even = world.cellSize % 2 == 0;
+    const halfWorld = Math.floor(world.cellSize / 2);
+    this.ctx.fillStyle = "black";
     for (let z = 0; z < world.cellSize; ++z) {
       for (let x = 0; x < world.cellSize; ++x) {
         const voxel = world.getVoxel(x, world.layer, z);
         if (voxel && voxel !== 100) {
-          this.ctx.fillRect(x, z, 1, 1);
+          this.ctx.fillRect((x - halfWorld) * 100, (z - halfWorld) * 100, 100, 100);
         }
       }
     }
+    const lw = w / this.camera.scale;
+    const lh = h / this.camera.scale;
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeStyle = "blue";
+    this.ctx.beginPath();
+    this.ctx.moveTo(0, -lh);
+    this.ctx.lineTo(0, lh);
+    this.ctx.stroke();
+    if (!even) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(100, -lh);
+      this.ctx.lineTo(100, lh);
+      this.ctx.stroke();
+    }
+    this.ctx.strokeStyle = "red";
+    this.ctx.beginPath();
+    this.ctx.moveTo(-lw, 0);
+    this.ctx.lineTo(lw, 0);
+    this.ctx.stroke();
+    if (!even) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(-lw, 100);
+      this.ctx.lineTo(lw, 100);
+      this.ctx.stroke();
+    }
+
+    this.ctx.fillStyle = "#3FF72681";
+    this.ctx.fillRect(
+      Math.floor(((-this.camera.pos.x + this.pointer.x) / this.camera.scale) / 100) * 100,
+      Math.floor(((-this.camera.pos.y + this.pointer.y) / this.camera.scale) / 100) * 100,
+      100,
+      100
+    );
   }
   regenerate(): void {
     const a = 1;
   }
   pointer_move(e: PointerEvent): void {
+    this.pointer.set(
+      (e.clientX),
+      (e.clientY)
+    );
     if (!this.dragging) return;
     this.camera.pos.add(new THREE.Vector2(e.movementX, e.movementY));
   }
