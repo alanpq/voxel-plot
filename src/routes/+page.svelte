@@ -28,12 +28,20 @@
 		tileTextureHeight
 	});
 
-	const canvas = document.createElement("canvas");
-	canvas.style.display = 'block';
-	document.body.appendChild(canvas);
+	const canvas3d = document.createElement("canvas");
+	canvas3d.style.display = 'block';
+
+	const canvas2d = document.createElement("canvas");
+	canvas2d.style.display = 'none';
+
+	document.body.appendChild(canvas3d);
+	document.body.appendChild(canvas2d);
 	
 	const gui = new GUI();
-	gui.add(options, 'is_2d').name("2D");
+	gui.add(options, 'is_2d').name("2D").onChange(() => {
+		canvas2d.style.display = options.is_2d ? 'block' : 'none';
+		canvas3d.style.display = options.is_2d ? 'none' : 'block';
+	});
 	gui
 		.add(options, 'layer', 0, options.height - 1, 1)
 		.listen()
@@ -42,16 +50,18 @@
 	gui.add(options, 'radius', 0, 50, 1).onChange(() => {regenerate()});
 	gui.add(options, 'bias', 0, 1).onChange(() => {regenerate()});
 
-	const r3d = new Renderer3D(canvas, gui.addFolder("3D"));
-	const r2d = new Renderer2D(canvas, gui.addFolder("2D"));
+	const r3d = new Renderer3D(canvas3d, gui.addFolder("3D"));
+	const r2d = new Renderer2D(canvas2d, gui.addFolder("2D"));
 	
 	const regenerate = (only_mesh = false) => {
 		if(!only_mesh) {
-			generate(world, options);
+			const output = generate(world, options);
+			options.height = output.height;
 			if (options.shell) shell(world);
 		}
 		(options.is_2d ? r2d : r3d).regenerate();
 	}
+	regenerate();
 	
 
 
