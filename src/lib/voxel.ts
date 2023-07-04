@@ -18,9 +18,11 @@ export class VoxelWorld {
   tileTextureHeight: number;
 
   public layer = 0;
+  height: number;
 
   constructor(options: {
     cellSize: number,
+    height: number,
     tileSize: number,
     tileTextureWidth: number,
     tileTextureHeight: number,
@@ -29,31 +31,33 @@ export class VoxelWorld {
     this.tileTextureWidth = options.tileTextureWidth;
     this.tileTextureHeight = options.tileTextureHeight;
     this.cellSize = options.cellSize;
-    const { cellSize } = this;
+    this.height = options.height;
+    const { cellSize, height } = this;
     this.cellSliceSize = cellSize * cellSize;
-    this.cell = new Uint8Array(cellSize * cellSize * cellSize);
+    this.cell = new Uint8Array(cellSize * cellSize * height);
   }
 
-  init(options: { cellSize: number }) {
+  init(options: { cellSize: number, height: number }) {
     this.cellSize = options.cellSize;
-    const { cellSize } = this;
+    this.height = options.height;
+    const { cellSize, height } = this;
     this.cellSliceSize = cellSize * cellSize;
-    this.cell = new Uint8Array(cellSize * cellSize * cellSize);
+    this.cell = new Uint8Array(cellSize * cellSize * height);
   }
 
   computeVoxelOffset(x: number, y: number, z: number) {
-    const { cellSize, cellSliceSize } = this;
+    const { height, cellSize, cellSliceSize } = this;
     const voxelX = THREE.MathUtils.euclideanModulo(x, cellSize) | 0;
-    const voxelY = THREE.MathUtils.euclideanModulo(y, cellSize) | 0;
+    const voxelY = THREE.MathUtils.euclideanModulo(y, height) | 0;
     const voxelZ = THREE.MathUtils.euclideanModulo(z, cellSize) | 0;
     return voxelY * cellSliceSize +
       voxelZ * cellSize +
       voxelX;
   }
   getCellForVoxel(x: number, y: number, z: number) {
-    const { cellSize } = this;
+    const { height, cellSize } = this;
     const cellX = Math.floor(x / cellSize);
-    const cellY = Math.floor(y / cellSize);
+    const cellY = Math.floor(y / height);
     const cellZ = Math.floor(z / cellSize);
     if (cellX !== 0 || cellY !== 0 || cellZ !== 0) {
       return null;
@@ -78,16 +82,16 @@ export class VoxelWorld {
     return cell[voxelOffset];
   }
   generateGeometryDataForCell(cellX: number, cellY: number, cellZ: number) {
-    const { cellSize, tileSize, tileTextureWidth, tileTextureHeight } = this;
+    const { height, cellSize, tileSize, tileTextureWidth, tileTextureHeight } = this;
     const positions = [];
     const normals = [];
     const uvs = [];
     const indices = [];
     const startX = cellX * cellSize;
-    const startY = cellY * cellSize;
+    const startY = cellY * height;
     const startZ = cellZ * cellSize;
 
-    for (let y = 0; y < cellSize; ++y) {
+    for (let y = 0; y < height; ++y) {
       const voxelY = startY + y;
       for (let z = 0; z < cellSize; ++z) {
         const voxelZ = startZ + z;

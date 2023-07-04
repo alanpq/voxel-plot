@@ -8,7 +8,7 @@ import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
 // @ts-ignore
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
-import { VoxelWorld } from './voxel';
+import type { VoxelWorld } from './voxel';
 import { generate } from './generators/sphere';
 import { shell } from './generators';
 import type Renderer from './renderer';
@@ -46,7 +46,7 @@ export default class Renderer3D implements Renderer {
   controls: OrbitControls;
 
   locked = false;
-  cur_voxel = -1;
+  cur_voxel: ReturnType<VoxelWorld["intersectRay"]> | null = null;
   bb: THREE.LineSegments<THREE.BufferGeometry<THREE.NormalBufferAttributes>, THREE.LineBasicMaterial>;
   grid: THREE.GridHelper;
 
@@ -133,8 +133,6 @@ export default class Renderer3D implements Renderer {
     this.composer.addPass(outputPass);
 
     gui.add(this.bb, 'visible').name("Draw bounding box");
-    gui.add(this, 'locked').disable().listen();
-    gui.add(this, 'cur_voxel').disable().listen();
 
     const ssao_gui = gui.addFolder('SSAO').close();
     ssao_gui
@@ -149,6 +147,13 @@ export default class Renderer3D implements Renderer {
     canvas.addEventListener("mouseup", (e) => {
       if (e.button !== 2) return;
       this.locked = !this.locked;
+    })
+
+    canvas.addEventListener("dblclick", (e) => {
+      if (e.button !== 0) return;
+      if (!this.cur_voxel) world.layer = 0;
+      else world.layer = Math.floor(this.cur_voxel.position.y + 1);
+      this.regenerate();
     })
 
   }
@@ -173,16 +178,23 @@ export default class Renderer3D implements Renderer {
     const intersect = world.intersectRay(start, end);
 
     if (intersect) {
-      this.cur_voxel = intersect.voxel;
+      this.cur_voxel = {
+        normal: intersect.normal.clone(),
+        position: intersect.position.clone(),
+        voxel: intersect.voxel,
+      };
+      const even = world.cellSize % 2 == 0;
+      const even_h = world.height % 2 == 0;
       intersect.position.add(this.world_off);
       this.hover_mesh.position.copy(intersect.position).sub(intersect.normal.multiplyScalar(0.5));
-      if (world.cellSize % 2 == 0)
-        this.hover_mesh.position.round();
-      else
-        this.hover_mesh.position.floor().addScalar(0.5);
+      this.hover_mesh.position.set(
+        even ? Math.round(this.hover_mesh.position.x) : Math.floor(this.hover_mesh.position.x) + 0.5,
+        even_h ? Math.round(this.hover_mesh.position.y) : Math.floor(this.hover_mesh.position.y) + 0.5,
+        even ? Math.round(this.hover_mesh.position.z) : Math.floor(this.hover_mesh.position.z) + 0.5,
+      );
       this.hover_mesh.visible = true;
     } else {
-      this.cur_voxel = -1;
+      this.cur_voxel = null;
       this.hover_mesh.visible = false;
     }
   }
@@ -198,16 +210,17 @@ export default class Renderer3D implements Renderer {
 
   regenerate() {
     this.hover_mesh.visible = false;
-    const bb_geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(world.cellSize, world.cellSize, world.cellSize));
+    const bb_geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(world.cellSize, world.height, world.cellSize));
     this.bb.geometry.dispose();
     this.bb.geometry = bb_geo;
 
     const even = (world.cellSize % 2 == 0);
+    const even_h = (world.height % 2 == 0);
 
     const off = Math.round((-world.cellSize / 2) + 0.5) + (even ? -0.5 : 0.0);
     this.world_off.set(
       off,
-      world.layer ? (-world.layer + (even ? 0.5 : 0.0)) : off,
+      world.layer ? (-world.layer + (even_h ? 0.5 : 0.0)) : Math.round((-world.height / 2) + 0.5) + (even_h ? -0.5 : 0.0),
       off
     );
     const { positions, normals, uvs, indices } = world.generateGeometryDataForCell(0, 0, 0);
@@ -227,6 +240,6 @@ export default class Renderer3D implements Renderer {
     this.voxels.position.copy(this.world_off);
     this.grid.position.setScalar(even ? 0.5 : 0);
     this.bb.position.setScalar(0.5);
-    if (world.layer) this.bb.position.setY(-(world.layer - world.cellSize / 2));
+    if (world.layer) this.bb.position.setY(-(world.layer - world.height / 2));
   };
 }

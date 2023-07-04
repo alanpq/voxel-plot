@@ -14,6 +14,7 @@ export const make_gui = (gui: GUI, regenerate: RegenerateFn): GUI => {
 export const generate: VoxelGenerator<CubeParams> = (world, { size }): GeneratorOutput => {
   world.init({
     cellSize: size,
+    height: size,
   })
   for (let x = 0; x < size; x++) {
     for (let z = 0; z < size; z++) {

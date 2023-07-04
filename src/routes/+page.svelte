@@ -6,12 +6,16 @@
 	import * as THREE from 'three';
 	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 	import type Renderer from '$lib/renderer';
+	import type { SphereParams } from '$lib/generators/sphere';
+	import type { CubeParams } from '$lib/generators/cube';
 
-	export const options = {
+	export const options: Record<string, any> & SphereParams & CubeParams = {
 		is_2d: false,
 		size: 10,
 		bias: 0.1,
 		shell: true,
+		dome: false,
+		flip: false,
 
 		generator: "sphere",
 		generator_fn: GENERATORS.sphere,
@@ -24,6 +28,7 @@
 	const tileTextureWidth = 256;
 	const tileTextureHeight = 64;
 	export const world = new VoxelWorld({
+		height: 0,
 		cellSize: 0,
 		tileSize,
 		tileTextureWidth,
@@ -47,7 +52,7 @@
 		regenerate(true);
 	});
 	gui
-		.add(world, 'layer', 0, options.height - 1, 1)
+		.add(world, 'layer', 0, world.height - 1, 1)
 		.listen()
 		.onChange(() => { regenerate(true) });
 	gui.add(options, 'shell').onChange(() => {regenerate()});
@@ -86,7 +91,7 @@
 	document.addEventListener('keydown', (e) => {
     switch (e.key) {
       case 'ArrowUp':
-        world.layer = Math.min(world.cellSize, world.layer + 1);
+        world.layer = Math.min(world.height, world.layer + 1);
         regenerate(true);
         break;
       case 'ArrowDown':
