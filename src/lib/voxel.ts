@@ -73,7 +73,7 @@ export class VoxelWorld {
     if (!cell) {
       return 0;
     }
-    if (this.layer !== undefined && y > this.layer) return 0;
+    if (this.layer && y > this.layer) return 0;
     const voxelOffset = this.computeVoxelOffset(x, y, z);
     return cell[voxelOffset];
   }
@@ -94,16 +94,18 @@ export class VoxelWorld {
         for (let x = 0; x < cellSize; ++x) {
           const voxelX = startX + x;
           const voxel = this.getVoxel(voxelX, voxelY, voxelZ);
-          if (voxel) {
+          if (voxel && voxel != 100) {
             // voxel 0 is sky (empty) so for UVs we start at 0
-            const uvVoxel = voxel - 1;
+            const midline = voxel == 2;
+            const curlayer = (this.layer && this.layer == voxelY);
+            const uvVoxel = curlayer ? 3 : (midline ? 7 : 2);
             // There is a voxel here but do we need faces for it?
             for (const { dir, corners, uvRow } of VoxelWorld.faces) {
               const neighbor = this.getVoxel(
                 voxelX + dir[0],
                 voxelY + dir[1],
                 voxelZ + dir[2]);
-              if (!neighbor) {
+              if (!neighbor || neighbor == 100) {
                 // this voxel has no neighbor in this direction so we need a face.
                 const ndx = positions.length / 3;
                 for (const { pos, uv } of corners) {
