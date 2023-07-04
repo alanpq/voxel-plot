@@ -198,7 +198,7 @@ export default class Renderer3D implements Renderer {
     this.bb.geometry = bb_geo;
 
     const off = Math.round((-world.cellSize / 2) + 0.5) + ((world.cellSize % 2 == 0) ? -0.5 : 0.0);
-    this.world_off = new THREE.Vector3(off, off, off);
+    this.world_off = new THREE.Vector3(off, world.layer ? -world.layer : off, off);
     const { positions, normals, uvs, indices } = world.generateGeometryDataForCell(0, 0, 0);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -216,5 +216,6 @@ export default class Renderer3D implements Renderer {
     this.voxels.position.copy(this.world_off);
     this.grid.position.setScalar((world.cellSize % 2 == 0) ? 0.5 : 0);
     this.bb.position.setScalar(0.5);
+    if (world.layer) this.bb.position.setY(-(world.layer - world.cellSize / 2));
   };
 }
