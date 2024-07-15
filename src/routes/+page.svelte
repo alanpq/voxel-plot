@@ -9,7 +9,7 @@
 	import type { SphereParams } from '$lib/generators/sphere';
 	import type { CubeParams } from '$lib/generators/cube';
 	import { writable } from 'svelte/store';
-	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	export const options: Record<string, any> & SphereParams & CubeParams = {
 		is_2d: false,
@@ -39,16 +39,24 @@
 
 	let is_2d = writable(false);
 	let cur_renderer: Renderer | null = null;
-	onMount(() => {
+
+	export type RegenerateFn = typeof regenerate;
+	const regenerate = (only_mesh = false) => {
+		if (!only_mesh) {
+			const output = options.generator_fn(world, options);
+			options.height = output.height;
+			if (options.shell) shell(world);
+		}
+		cur_renderer?.regenerate();
+	};
+
+	if (browser) {
 		const canvas3d = document.createElement('canvas');
 		canvas3d.style.display = 'block';
-
 		const canvas2d = document.createElement('canvas');
 		canvas2d.style.display = 'none';
-
 		document.body.appendChild(canvas3d);
 		document.body.appendChild(canvas2d);
-
 		const gui = new GUI();
 		gui
 			.add(options, 'is_2d')
@@ -68,7 +76,6 @@
 		gui.add(options, 'shell').onChange(() => {
 			regenerate();
 		});
-
 		let gen_folders: ReturnType<typeof make_gui_folders> | null = null;
 		const gen_ctrl = gui
 			.add(options, 'generator', Object.keys(GENERATORS))
@@ -82,18 +89,15 @@
 			});
 		gen_folders = make_gui_folders(gui, regenerate);
 		gen_ctrl.reset();
-
 		const r3d = new Renderer3D(canvas3d, gui.addFolder('3D').close());
 		const r2d = new Renderer2D(canvas2d, gui.addFolder('2D').close());
 		cur_renderer = options.is_2d ? r2d : r3d;
 		regenerate();
-
 		const loaded = localStorage.getItem('options');
 		if (loaded) gui.load(JSON.parse(loaded));
 		gui.onChange((e) => {
 			localStorage.setItem('options', JSON.stringify(gui.save()));
 		});
-
 		document.addEventListener('keydown', (e) => {
 			switch (e.key) {
 				case 'ArrowUp':
@@ -115,23 +119,11 @@
 		window.addEventListener('resize', () => {
 			cur_renderer?.window_resize();
 		});
-
-		animate();
-	});
-
-	export type RegenerateFn = typeof regenerate;
-	const regenerate = (only_mesh = false) => {
-		if (!only_mesh) {
-			const output = options.generator_fn(world, options);
-			options.height = output.height;
-			if (options.shell) shell(world);
+		function animate() {
+			requestAnimationFrame(animate);
+			cur_renderer?.animate();
 		}
-		cur_renderer?.regenerate();
-	};
-
-	function animate() {
-		requestAnimationFrame(animate);
-		cur_renderer?.animate();
+		animate();
 	}
 </script>
 
