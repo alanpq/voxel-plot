@@ -9,6 +9,7 @@
 	import type { SphereParams } from '$lib/generators/sphere';
 	import type { CubeParams } from '$lib/generators/cube';
 	import { writable } from 'svelte/store';
+	import { onMount } from 'svelte';
 
 	export const options: Record<string, any> & SphereParams & CubeParams = {
 		is_2d: false,
@@ -36,37 +37,87 @@
 		tileTextureHeight
 	});
 
-	const canvas3d = document.createElement('canvas');
-	canvas3d.style.display = 'block';
-
-	const canvas2d = document.createElement('canvas');
-	canvas2d.style.display = 'none';
-
-	document.body.appendChild(canvas3d);
-	document.body.appendChild(canvas2d);
-
 	let is_2d = writable(false);
-
-	const gui = new GUI();
-	gui
-		.add(options, 'is_2d')
-		.name('2D')
-		.onChange(() => {
-			is_2d.set(options.is_2d);
-			cur_renderer = options.is_2d ? r2d : r3d;
-			canvas2d.style.display = options.is_2d ? 'block' : 'none';
-			canvas3d.style.display = options.is_2d ? 'none' : 'block';
-			regenerate(true);
-		});
-	gui
-		.add(world, 'layer', 0, world.height - 1, 1)
-		.disable()
-		.listen();
-	// .onChange(() => { regenerate(true) });
-	gui.add(options, 'shell').onChange(() => {
-		regenerate();
-	});
 	let cur_renderer: Renderer | null = null;
+	onMount(() => {
+		const canvas3d = document.createElement('canvas');
+		canvas3d.style.display = 'block';
+
+		const canvas2d = document.createElement('canvas');
+		canvas2d.style.display = 'none';
+
+		document.body.appendChild(canvas3d);
+		document.body.appendChild(canvas2d);
+
+		const gui = new GUI();
+		gui
+			.add(options, 'is_2d')
+			.name('2D')
+			.onChange(() => {
+				is_2d.set(options.is_2d);
+				cur_renderer = options.is_2d ? r2d : r3d;
+				canvas2d.style.display = options.is_2d ? 'block' : 'none';
+				canvas3d.style.display = options.is_2d ? 'none' : 'block';
+				regenerate(true);
+			});
+		gui
+			.add(world, 'layer', 0, world.height - 1, 1)
+			.disable()
+			.listen();
+		// .onChange(() => { regenerate(true) });
+		gui.add(options, 'shell').onChange(() => {
+			regenerate();
+		});
+
+		let gen_folders: ReturnType<typeof make_gui_folders> | null = null;
+		const gen_ctrl = gui
+			.add(options, 'generator', Object.keys(GENERATORS))
+			.onChange((k: keyof typeof GENERATORS) => {
+				options.generator_fn = GENERATORS[k];
+				if (gen_folders) {
+					for (const f of Object.values(gen_folders)) f.hide();
+					for (const c of gen_folders[k].show().controllers) c.updateDisplay();
+				}
+				regenerate();
+			});
+		gen_folders = make_gui_folders(gui, regenerate);
+		gen_ctrl.reset();
+
+		const r3d = new Renderer3D(canvas3d, gui.addFolder('3D').close());
+		const r2d = new Renderer2D(canvas2d, gui.addFolder('2D').close());
+		cur_renderer = options.is_2d ? r2d : r3d;
+		regenerate();
+
+		const loaded = localStorage.getItem('options');
+		if (loaded) gui.load(JSON.parse(loaded));
+		gui.onChange((e) => {
+			localStorage.setItem('options', JSON.stringify(gui.save()));
+		});
+
+		document.addEventListener('keydown', (e) => {
+			switch (e.key) {
+				case 'ArrowUp':
+					world.layer = Math.min(world.height, world.layer + 1);
+					regenerate(true);
+					break;
+				case 'ArrowDown':
+					world.layer = Math.max(0, world.layer - 1);
+					regenerate(true);
+					break;
+				default:
+					// console.debug(e.key);
+					break;
+			}
+		});
+		document.addEventListener('pointermove', (e) => {
+			cur_renderer?.pointer_move(e);
+		});
+		window.addEventListener('resize', () => {
+			cur_renderer?.window_resize();
+		});
+
+		animate();
+	});
 
 	export type RegenerateFn = typeof regenerate;
 	const regenerate = (only_mesh = false) => {
@@ -77,58 +128,11 @@
 		}
 		cur_renderer?.regenerate();
 	};
-	let gen_folders: ReturnType<typeof make_gui_folders> | null = null;
-	const gen_ctrl = gui
-		.add(options, 'generator', Object.keys(GENERATORS))
-		.onChange((k: keyof typeof GENERATORS) => {
-			options.generator_fn = GENERATORS[k];
-			if (gen_folders) {
-				for (const f of Object.values(gen_folders)) f.hide();
-				for (const c of gen_folders[k].show().controllers) c.updateDisplay();
-			}
-			regenerate();
-		});
-	gen_folders = make_gui_folders(gui, regenerate);
-	gen_ctrl.reset();
-
-	const r3d = new Renderer3D(canvas3d, gui.addFolder('3D').close());
-	const r2d = new Renderer2D(canvas2d, gui.addFolder('2D').close());
-	cur_renderer = options.is_2d ? r2d : r3d;
-	regenerate();
-
-	const loaded = localStorage.getItem('options');
-	if (loaded) gui.load(JSON.parse(loaded));
-	gui.onChange((e) => {
-		localStorage.setItem('options', JSON.stringify(gui.save()));
-	});
-
-	document.addEventListener('keydown', (e) => {
-		switch (e.key) {
-			case 'ArrowUp':
-				world.layer = Math.min(world.height, world.layer + 1);
-				regenerate(true);
-				break;
-			case 'ArrowDown':
-				world.layer = Math.max(0, world.layer - 1);
-				regenerate(true);
-				break;
-			default:
-				// console.debug(e.key);
-				break;
-		}
-	});
-	document.addEventListener('pointermove', (e) => {
-		cur_renderer?.pointer_move(e);
-	});
-	window.addEventListener('resize', () => {
-		cur_renderer?.window_resize();
-	});
 
 	function animate() {
 		requestAnimationFrame(animate);
 		cur_renderer?.animate();
 	}
-	animate();
 </script>
 
 <article>
