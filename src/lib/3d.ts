@@ -94,7 +94,7 @@ export default class Renderer3D implements Renderer {
     this.world_off = new THREE.Vector3();
 
     const loader = new THREE.TextureLoader();
-    const texture = loader.load('/flourish-cc-by-nc-sa.png');
+    const texture = loader.load('flourish-cc-by-nc-sa.png');
     texture.magFilter = THREE.NearestFilter;
     texture.minFilter = THREE.NearestFilter;
 
