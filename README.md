@@ -1,4 +1,6 @@
 # voxel-plot
+[See Demo](https://alanpq.github.io/voxel-plot/)
+
 3D Voxel shape generator + viewer. Currently supports:
 - Layer slicing / onion skinning
 - 2D/3D views
